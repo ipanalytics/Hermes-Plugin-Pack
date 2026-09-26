@@ -1,8 +1,8 @@
 # Hermes Plugin Pack
 
-Four plugins we run every day on a Hermes Agent box. They are small on purpose: each one is a
-single Python file, has no third-party dependencies, and does one job that the default agent
-does not do.
+Four plugins we run every day on a Hermes Agent box. They are small on purpose: each plugin is a
+directory with a manifest and one or two Python files, no third-party dependencies, and does one
+job that the default agent does not do.
 
 Most plugin examples you find are demos. These are the pieces that survived months of daily
 use — a feedback journal, a skill drafter, a sandboxed shell, and a context compactor that
@@ -19,7 +19,7 @@ never rewrites your transcript.
 | `feedback-reactions` | Your thumbs up/down in chat disappears into the void | `gateway_platform_event` | nothing |
 | `skill-factory` | The same workflow is redone by hand every week | `post_tool_call` + 5 slash commands | nothing |
 | `proot-sandbox` | Agent shell commands can read your secrets and home directory | terminal environment provider | a `proot` build |
-| `jev_compact` | Compaction rewrites the whole transcript and loses detail | `pre_llm_call` context hook | TypeSafe API key |
+| `jev_compact` | Compaction rewrites the whole transcript and loses detail | context engine | TypeSafe API key |
 
 ---
 
@@ -109,8 +109,7 @@ updates. Install upstream, pin the version, and keep your own pack for things yo
 ```sh
 # Hermes Agent keeps plugins next to its home directory
 mkdir -p "${HERMES_HOME:-$HOME/.hermes}/plugins"
-cp -r feedback-reactions skill-factory proot-sandbox jev_compact \
-      "${HERMES_HOME:-$HOME/.hermes}/plugins/"
+cp -r plugins/* "${HERMES_HOME:-$HOME/.hermes}/plugins/"
 
 hermes plugins doctor     # will complain about missing TYPESAFE_API_KEY for jev_compact
 ```
@@ -126,7 +125,7 @@ A Hermes plugin is a directory with `plugin.yaml` and an `__init__.py` exposing 
 
 ```python
 def register(ctx):
-    ctx.register_hook("post_tool_call", my_hook)        # observe
+    ctx.register_hook("post_tool_call", my_hook)  # observe
     ctx.register_command("my-command", my_command, description="…")  # act
 ```
 
@@ -148,15 +147,25 @@ terminal environment provider surface for backends.
 
 ## Status and testing
 
-| Plugin | Unit tests | Verified by |
-| --- | --- | --- |
-| `feedback-reactions` | none yet | months of daily use |
-| `skill-factory` | none yet | daily use, `hermes plugins doctor` clean |
-| `proot-sandbox` | none yet | a sandboxed coding profile that runs day and night |
-| `jev_compact` | none yet | daily compaction runs with an audit log |
+```sh
+python -m pytest -q      # 39 passed
+python -m ruff check .   # clean
+```
 
-Honest state: the code is exercised in production daily, but it does not ship with a test suite
-yet. Tests are the next commit — a plugin with no tests is a plugin nobody dares to patch.
+| Plugin | Tests | Covered |
+| --- | --- | --- |
+| `feedback-reactions` | 7 | verdict mapping, journal row shape, ignored events, broken payloads, hook binding |
+| `skill-factory` | 10 | bounded window, repetition counting, propose output, save/list/clear, atomic state |
+| `proot-sandbox` | 9 | bind table (home root not mounted), stripped keys, `$HERMES_HOME` paths, sandbox home name, timeout → 124 |
+| `jev_compact` | 13 | pair matching, drop with orphaned result, shrink instead of delete, protected head/tail, answer parsing, audit log, no-key and API-failure fallbacks |
+
+The tests load the plugins the way the host does (by path, with a fake `ctx`) and never touch
+the network: the TypeSafe call is stubbed, `subprocess` is faked. Everything the plugins write
+goes to a throwaway `$HERMES_HOME` under `tmp_path`.
+
+What the tests do **not** prove: that the plugins behave the same inside a live Hermes process.
+That part is still "runs every day in production", which is how the bugs that are fixed here
+were found in the first place.
 
 ---
 

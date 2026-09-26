@@ -1,0 +1,23 @@
+[project]
+name = "hermes-plugin-pack"
+version = "1.0.0"
+description = "Plugins for Hermes Agent: feedback journal, skill drafting, proot sandbox, verbatim context compaction"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pyyaml>=6"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RUF"]
+# E501: long lines are a style choice, not a bug. RUF001: we print "×3" in reports on purpose.
+ignore = ["E501", "RUF001"]

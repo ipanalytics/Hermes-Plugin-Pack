@@ -1,0 +1,10 @@
+name: skill-factory
+version: 0.2.0
+description: "Watches the workflow of a session and proposes the repeated part as a reusable Hermes skill (/skill-factory-propose)"
+author: "ipanalytics (idea: Romanescu11/hermes-skill-factory)"
+license: MIT
+kind: standalone
+manifest_version: 2
+provides_hooks:
+  - post_tool_call
+tags: [skills, automation, workflow, learning, tooling]

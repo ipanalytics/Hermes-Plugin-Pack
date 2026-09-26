@@ -1,0 +1,14 @@
+name: proot-sandbox
+version: 1.0.0
+description: "Runs the agent's shell commands under proot: /workspace is writable, $HERMES_HOME (secrets, memory, sessions) is not mounted at all"
+author: ipanalytics
+license: MIT
+kind: backend
+manifest_version: 2
+provides_hooks: []
+requires_hermes: ">=0.21"
+config_schema:
+  workspace: {type: str, description: "host directory mounted as /workspace (default: $HERMES_HOME/coder-workspace)"}
+  scratch_home: {type: str, description: "directory mounted as the sandbox home (default: /tmp/sb-home)"}
+  scratch_tmp: {type: str, description: "directory mounted as /tmp (default: $HERMES_HOME/coder-spool)"}
+tags: [sandbox, proot, security, terminal, isolation]

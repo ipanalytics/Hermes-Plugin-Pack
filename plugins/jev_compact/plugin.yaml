@@ -1,0 +1,16 @@
+name: jev_compact
+version: 1.0.0
+description: "Context compaction that never summarises: a fast decision model scores each tool call, stale ones are cut, everything that stays stays verbatim"
+author: "ipanalytics (idea: tamaratran/fast-jev-compaction, MIT)"
+license: MIT
+kind: context-engine
+manifest_version: 2
+entry: __init__.py
+requires_env:
+  - TYPESAFE_API_KEY
+config_schema:
+  threshold_tokens: {type: int, description: "compress once the prompt reaches this many tokens (default 250000)"}
+  protect_first_n: {type: int, description: "messages at the head that are never touched"}
+  protect_last_n: {type: int, description: "messages at the tail that are never touched"}
+  drop_probability: {type: float, description: "probability above which an answered call is dropped (default 0.75)"}
+tags: [context, compaction, memory, cost-control, typesafe]

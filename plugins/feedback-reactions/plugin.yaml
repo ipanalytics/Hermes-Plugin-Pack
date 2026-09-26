@@ -1,0 +1,10 @@
+name: feedback-reactions
+version: 1.0.0
+description: Writes the owner's chat reactions (👍/👎) into a feedback journal at $HERMES_HOME/data/feedback.jsonl
+author: ipanalytics
+license: MIT
+kind: standalone
+manifest_version: 2
+provides_hooks:
+  - gateway_platform_event
+tags: [feedback, telegram, signals, journal, review]
