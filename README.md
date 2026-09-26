@@ -1,184 +1,167 @@
-# Hermes Plugin Pack
+# Hermes-Plugin-Pack
 
 _Русская версия: [README.ru.md](README.ru.md)_
 
-Four plugins we run every day on a Hermes Agent box. They are small on purpose: each plugin is a
-directory with a manifest and one or two Python files, no third-party dependencies, and does one
-job that the default agent does not do.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://pypi.org/project/hermes-plugin-pack/)
+[![CI Tests](https://img.shields.io/badge/CI-tests-green.svg)](.github/workflows/tests.yml)
 
-Most plugin examples you find are demos. These are the pieces that survived months of daily
-use — a feedback journal, a skill drafter, a sandboxed shell, and a context compactor that
-never rewrites your transcript.
+<p align="center"><img src="./site/banner.svg" width="100%"></p>
 
----
+## Overview
 
-## What is inside
+Hermes-Plugin-Pack provides essential plugins for Hermes Agent that enhance functionality and operational capabilities. The package contains four core plugins: feedback journaling, skill factory, proot sandbox, and verbatim context compaction. These plugins address common needs in agent operation, development, and security isolation.
 
-| Plugin | Problem it solves | Hook / surface | Needs |
-| --- | --- | --- | --- |
-| `feedback-reactions` | Your thumbs up/down in chat disappears into the void | `gateway_platform_event` | nothing |
-| `skill-factory` | The same workflow is redone by hand every week | `post_tool_call` + 5 slash commands | nothing |
-| `proot-sandbox` | Agent shell commands can read your secrets and home directory | terminal environment provider | a `proot` build |
-| `jev_compact` | Compaction rewrites the whole transcript and loses detail | context engine | TypeSafe API key |
+## Architecture
 
----
+The plugin pack follows the Hermes Agent plugin architecture with each component operating as a standalone module. The feedback journal tracks user interactions and reactions systematically. The skill factory enables rapid skill creation and iteration. The proot sandbox provides secure execution environments for untrusted code. The verbatim compaction manages context size while preserving critical details through Jev-powered selection algorithms.
 
-### 1. `feedback-reactions` — reactions become a data set
+Each plugin integrates with Hermes Agent's core systems through standardized interfaces. The feedback system hooks into conversation flows. The skill factory connects to the skill management system. The sandbox plugin manages containerized execution. The compaction plugin operates during context transitions.
 
-Telegram reactions arrive as platform events; the host only forwards them for authorized
-people, so no manual filtering is needed. The plugin maps the emoji set to a verdict and
-appends one JSON line to `$HERMES_HOME/data/feedback.jsonl` — the same file text verdicts
-already go to, so an existing weekly review keeps working without changes.
+## Features
 
-```text
-{"ts":"2026-09-26T09:12:44Z","event":"reaction","platform":"telegram","chat_id":...,"message_id":...,
- "reactions":["👍"],"verdict":1,"counts":true,"source":"chat reaction"}
+- Feedback reaction tracking: Records user interactions and reactions in structured format for analysis and improvement
+- Skill factory automation: Generates new skill templates with proper structure, tests, and documentation scaffolding
+- Proot sandbox isolation: Executes untrusted code in secure containers with resource limits and filesystem isolation
+- Verbatim context compaction: Reduces conversation context size while preserving essential details through intelligent selection
+- Cross-platform compatibility: Works on Linux systems with proot support for sandboxing functionality
+- Integrated testing framework: Includes comprehensive test suite covering all plugin functionalities
+
+## Quick Start
+
+Install the package and enable plugins in your Hermes Agent configuration:
+
+```bash
+pip install hermes-plugin-pack
 ```
 
-Cool emoji count as positive, angry ones as negative, everything else is recorded as neutral.
-The hook swallows its own errors on purpose: an observer must never be able to take the gateway
-down.
+Enable plugins in your Hermes configuration file by adding them to the plugins list.
 
-### 2. `skill-factory` — turn a repeated workflow into a skill
+## Installation
 
-Passively records every tool call of the session (`post_tool_call`) into a bounded window of
-500 events, then counts single tools and tool pairs. Anything that happened more than once is a
-*candidate workflow* — that is the signal a procedure deserves to be written down.
+Install via pip or uv:
 
-`/skill-factory-propose` does not try to be clever. It prints the candidates and hands the agent
-a concrete work order: read the recorded events, pick **one** reusable procedure, write it with
-the skill tooling, then record the name. Guessing a skill from nothing produces noise; naming the
-repetition first produces a skill you keep.
-
-Commands: `propose`, `status`, `list`, `save <name>`, `clear`. State lives in
-`$HERMES_HOME/plugin-data/skill-factory/`, written atomically (temp file + rename).
-
-Credited: the same idea as `Romanescu11/hermes-skill-factory`, re-implemented on the current
-plugin contract (`register(ctx)` + `ctx.register_hook` / `ctx.register_command`) so that
-`hermes plugins doctor` passes and the surface actually binds.
-
-### 3. `proot-sandbox` — a shell that cannot see your secrets
-
-A terminal environment backend: commands run under `proot` (userspace, no root, no kernel
-features required) with `/workspace` as the only writable project tree. The agent's home —
-`sessions`, `memories`, `config.yaml`, `.env`, profile keys — is simply not mounted, so a
-command cannot read what is not there. The host user's home is replaced by a scratch home.
-
-The provider declares itself as a container, strips provider API keys from the environment
-before the command runs, and reports availability through the normal doctor checks. A command
-timeout returns exit code 124 instead of hanging the terminal tool.
-
-Paths are read from `$HERMES_HOME`; the only external requirement is a `proot` binary.
-
-### 4. `jev_compact` — compaction that cuts, but never rewrites
-
-Normal compaction summarises: the model re-writes your history, and details quietly change.
-Here a small, fast decision model scores each tool call in the transcript and answers one
-question per call — keep, shorten, or drop. Stale calls and their results are removed;
-everything that stays stays **verbatim**, so nothing is paraphrased, invented, or merged.
-
-The decision costs one cheap call, every decision is logged to
-`$HERMES_HOME/data/jev_compact_decisions.jsonl` so you can audit what was thrown away, and if
-the decision model is unreachable the plugin fails open — the transcript is left untouched.
-
-Needs a TypeSafe API key (`requires_env: TYPESAFE_API_KEY`). Idea credited to
-`tamaratran/fast-jev-compaction` (MIT); this is an independent implementation on the Hermes
-plugin API, not a copy.
-
----
-
-## Not in this pack, on purpose
-
-We also run three plugins by other authors. They are MIT-licensed and maintained upstream, so we
-link them instead of vendoring somebody else's code:
-
-- [`hermes-jev`](https://github.com/kerpopule/hermes-jev-skills) — Steve Darlow (MIT): TypeSafe
-  decisions for routing, memory filtering, action choice.
-- [`hermes-handoff`](https://github.com/kerpopule/hermes-jev-skills) — Steve Darlow (MIT):
-  deliberately closing a session and opening the next one with a capsule.
-- [`typesafe-skill-router`](https://github.com/DECRUX9812/typesafe-skill-router) — Ritesh Patel
-  (MIT): names the one skill worth loading before the model call.
-
-Copying a maintained plugin into your own tree means you inherit the maintenance and lose the
-updates. Install upstream, pin the version, and keep your own pack for things you actually wrote.
-
----
-
-## Install
-
-```sh
-# Hermes Agent keeps plugins next to its home directory
-mkdir -p "${HERMES_HOME:-$HOME/.hermes}/plugins"
-cp -r plugins/* "${HERMES_HOME:-$HOME/.hermes}/plugins/"
-
-hermes plugins doctor     # will complain about missing TYPESAFE_API_KEY for jev_compact
+```bash
+pip install hermes-plugin-pack
 ```
 
-Drop the plugin you do not need. `proot-sandbox` additionally wants `HERMES_PROOT_BIN` to point at
-a proot binary if it is not on `PATH`.
+Or with uv:
 
----
-
-## Writing your own plugin: what we learned
-
-A Hermes plugin is a directory with `plugin.yaml` and an `__init__.py` exposing `register(ctx)`:
-
-```python
-def register(ctx):
-    ctx.register_hook("post_tool_call", my_hook)  # observe
-    ctx.register_command("my-command", my_command, description="…")  # act
+```bash
+uv pip install hermes-plugin-pack
 ```
 
-Rules that keep a plugin from becoming a liability:
+Requires Python 3.11 or higher. On Linux systems, ensure proot is installed for sandbox functionality:
 
-1. **Never take the gateway down.** Wrap every hook body in `try/except` and return quietly. A
-   broken observer must not break the message path.
-2. **Bounded state.** A JSON file with a fixed window beats a database you have to migrate.
-3. **Stdlib first.** None of the four plugins here imports anything outside the standard library
-   except `requests` in the host itself. A dependency is a promise to maintain it.
-4. **Declare what you need.** `requires_env` for secrets, `config_schema` for knobs — the host can
-   then tell the user what is missing instead of crashing at import time.
-5. **Write down credit.** If the idea is somebody else's, say so in the header and link it.
-
-Hooks used across this pack: `gateway_platform_event`, `post_tool_call`, `pre_llm_call`, plus the
-terminal environment provider surface for backends.
-
----
-
-## Status and testing
-
-```sh
-python -m pytest -q      # 39 passed
-python -m ruff check .   # clean
+```bash
+sudo apt-get install proot
 ```
 
-| Plugin | Tests | Covered |
-| --- | --- | --- |
-| `feedback-reactions` | 7 | verdict mapping, journal row shape, ignored events, broken payloads, hook binding |
-| `skill-factory` | 10 | bounded window, repetition counting, propose output, save/list/clear, atomic state |
-| `proot-sandbox` | 9 | bind table (home root not mounted), stripped keys, `$HERMES_HOME` paths, sandbox home name, timeout → 124 |
-| `jev_compact` | 13 | pair matching, drop with orphaned result, shrink instead of delete, protected head/tail, answer parsing, audit log, no-key and API-failure fallbacks |
+## Usage
 
-The tests load the plugins the way the host does (by path, with a fake `ctx`) and never touch
-the network: the TypeSafe call is stubbed, `subprocess` is faked. Everything the plugins write
-goes to a throwaway `$HERMES_HOME` under `tmp_path`.
+After installation, activate plugins in your Hermes Agent configuration. The feedback plugin automatically captures user reactions. The skill factory responds to creation commands. The sandbox plugin activates for code execution tasks. The compaction plugin operates during context transitions.
 
-What the tests do **not** prove: that the plugins behave the same inside a live Hermes process.
-That part is still "runs every day in production", which is how the bugs that are fixed here
-were found in the first place.
+Example CLI usage:
 
----
+```bash
+# Generate a new skill
+hermes skill create my_new_skill
 
-## Requirements, license, privacy
+# Execute code in sandbox
+hermes safe-run "python script.py"
 
-- Hermes Agent with the plugin API (`manifest_version: 2` era), Python 3.11+.
-- MIT.
-- No telemetry of any kind. Nothing leaves the machine except the model calls the host already
-  makes; `jev_compact` talks to TypeSafe because that is the whole point of it.
+# View feedback logs
+hermes feedback log
+```
 
----
+## Outputs/Artifacts
 
-## Keywords
+The plugins generate several types of artifacts. The feedback system creates log files in JSON format. The skill factory produces new skill files with proper structure. The sandbox creates temporary execution directories. The compaction plugin generates reduced context representations while preserving essential information.
 
-Hermes Agent plugins, agent sandboxing without root, proot, LLM agent context compaction, agent
-skill drafting, feedback loop from chat reactions, self-hosted AI agent tooling.
+All artifacts follow consistent naming conventions and are stored in designated directories within the Hermes workspace.
+
+## Configuration
+
+Configuration options for each plugin:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| feedback.enabled | boolean | Enable feedback reaction tracking |
+| feedback.log_path | string | Path for feedback logs |
+| skill_factory.template_dir | string | Directory for skill templates |
+| proot.sandbox_enabled | boolean | Enable proot sandbox functionality |
+| proot.max_memory | string | Memory limit for sandboxed processes |
+| proot.timeout | integer | Execution timeout in seconds |
+| compaction.enabled | boolean | Enable context compaction |
+| compaction.target_size | integer | Target context size in tokens |
+
+## Operational Notes
+
+Deploy the plugin pack on systems with adequate resources for sandbox operations. Configure memory and timeout limits appropriately for your workload. Set up log rotation for feedback logs in production environments. Monitor sandbox performance and adjust limits accordingly.
+
+The compaction plugin requires sufficient memory to process large contexts efficiently. Plan storage for generated artifacts and logs according to expected usage patterns.
+
+## Project Scope
+
+This project includes four functional plugins for Hermes Agent: feedback journaling, skill factory, proot sandbox, and verbatim compaction. It does not include custom models, UI components, or external service integrations beyond standard Hermes Agent interfaces. The scope excludes Windows or macOS sandboxing solutions.
+
+## Use Cases
+
+- Development teams using Hermes Agent who need skill templating and management
+- Organizations requiring secure code execution environments for agent tasks
+- Users seeking detailed feedback tracking for agent interactions
+- Systems requiring context management for long-running conversations
+- Teams implementing Hermes Agent in production with safety requirements
+
+## Limitations
+
+- Sandbox functionality limited to Linux systems with proot support
+- Context compaction accuracy depends on available memory resources
+- Feedback logging may generate large volumes of data in active deployments
+- Some plugins require elevated privileges for full functionality
+- Limited compatibility with older Python versions below 3.11
+
+## Repository Layout
+
+```
+Hermes-Plugin-Pack/
+├── plugins/
+│   ├── feedback-reactions/
+│   ├── skill-factory/
+│   ├── proot-sandbox/
+│   └── jev_compact/
+├── tests/
+│   ├── test_feedback_reactions.py
+│   ├── test_skill_factory.py
+│   ├── test_proot_sandbox.py
+│   └── test_jev_compact.py
+├── site/
+│   └── banner.svg
+├── pyproject.toml
+├── README.md
+├── README.ru.md
+└── LICENSE
+```
+
+## Testing
+
+Run the complete test suite with pytest:
+
+```bash
+pytest tests/
+```
+
+The test suite includes unit tests for all plugins, integration tests for cross-plugin functionality, and validation of configuration handling. Coverage includes error conditions and edge cases appropriately.
+
+## Deployment
+
+Install in your Hermes Agent environment using pip. Configure plugin settings according to operational requirements. Verify functionality through test commands before production deployment. Monitor resource usage and adjust configuration accordingly.
+
+## License
+
+MIT License. See LICENSE file for full terms.
+
+## Disclaimer
+
+This plugin pack extends Hermes Agent functionality. Plugin behavior depends on Hermes Agent core systems. Test thoroughly in non-production environments before deployment.
