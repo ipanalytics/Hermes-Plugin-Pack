@@ -1,13 +1,7 @@
-[project]
-name = "hermes-plugin-pack"
-version = "1.0.0"
-description = "Plugins for Hermes Agent: feedback journal, skill drafting, proot sandbox, verbatim context compaction"
-readme = "README.md"
-requires-python = ">=3.11"
-license = { text = "MIT" }
-
-[project.optional-dependencies]
-dev = ["pytest>=8", "pyyaml>=6"]
+# This repository is a collection of plugins, not a Python distribution.
+# A plugin is loaded by the host from $HERMES_HOME/plugins/<name>, so there is
+# nothing to package or publish; the tables below configure the test and lint
+# tools only.
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

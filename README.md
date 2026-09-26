@@ -4,7 +4,6 @@ _Русская версия: [README.ru.md](README.ru.md)_
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://pypi.org/project/hermes-plugin-pack/)
 [![CI Tests](https://img.shields.io/badge/CI-tests-green.svg)](.github/workflows/tests.yml)
 
 <p align="center"><img src="./site/banner.svg" width="100%"></p>
@@ -21,59 +20,64 @@ Each plugin integrates with Hermes Agent's core systems through standardized int
 
 ## Features
 
-- Feedback reaction tracking: Records user interactions and reactions in structured format for analysis and improvement
-- Skill factory automation: Generates new skill templates with proper structure, tests, and documentation scaffolding
-- Proot sandbox isolation: Executes untrusted code in secure containers with resource limits and filesystem isolation
-- Verbatim context compaction: Reduces conversation context size while preserving essential details through intelligent selection
-- Cross-platform compatibility: Works on Linux systems with proot support for sandboxing functionality
-- Integrated testing framework: Includes comprehensive test suite covering all plugin functionalities
-
+- **Reaction journal.** A thumbs-up or thumbs-down from the chat front end becomes a line in `$HERMES_HOME/data/feedback.jsonl` with the message it answered, so a review pass has evidence instead of memory.
+- **Sandbox without root.** `proot-sandbox` makes the terminal backend run under proot: `/workspace` is writable, the home directory that holds secrets, memory and session history is not mounted at all.
+- **Compaction that cuts instead of rewriting.** `jev_compact` scores each tool call and removes the stale ones; what stays stays verbatim, because a summary is a quiet lie about paths, numbers and errors.
+- **Skills proposed from the session.** `skill-factory` watches a workflow through `post_tool_call` and offers the repeated part as a skill, so the next session starts from a procedure rather than from a transcript.
+- **Failure that degrades, not breaks.** If the decision model is unreachable, compaction falls back to a deterministic cut; if proot is missing, the plugin reports it instead of silently running the command unsandboxed.
 ## Quick Start
 
-Install the package and enable plugins in your Hermes Agent configuration:
+The plugins are directories, not a distribution: the host loads a plugin from `$HERMES_HOME/plugins/<name>` and enables it by name in `plugins.enabled`. There is no install step, because there is no package to install.
 
 ```bash
-pip install hermes-plugin-pack
+git clone https://github.com/ipanalytics/Hermes-Plugin-Pack.git
+mkdir -p "$HERMES_HOME/plugins"
+cp -r Hermes-Plugin-Pack/plugins/* "$HERMES_HOME/plugins/"
 ```
 
-Enable plugins in your Hermes configuration file by adding them to the plugins list.
+```yaml
+# config.yaml
+plugins:
+  enabled:
+    - feedback-reactions
+    - proot-sandbox
+    - skill-factory
+    - jev_compact
+```
+
+The host reads the list at startup, so a change takes effect after a gateway restart.
 
 ## Installation
 
-Install via pip or uv:
+| Plugin | Kind | Needs |
+| --- | --- | --- |
+| `feedback-reactions` | standalone | a front end that emits reactions |
+| `proot-sandbox` | backend | `proot` on `PATH` (`apt-get install proot`), Hermes 0.21 or newer |
+| `skill-factory` | standalone | nothing |
+| `jev_compact` | context-engine | `TYPESAFE_API_KEY` in the environment |
 
-```bash
-pip install hermes-plugin-pack
-```
-
-Or with uv:
-
-```bash
-uv pip install hermes-plugin-pack
-```
-
-Requires Python 3.11 or higher. On Linux systems, ensure proot is installed for sandbox functionality:
-
-```bash
-sudo apt-get install proot
-```
+A plugin directory holds its manifest (`plugin.yaml`), its code (`__init__.py`), its own README and, where it has one, a helper module. Installation is a copy, enabling is a line in the config, removal is the reverse of both. Python 3.11 or newer.
 
 ## Usage
 
-After installation, activate plugins in your Hermes Agent configuration. The feedback plugin automatically captures user reactions. The skill factory responds to creation commands. The sandbox plugin activates for code execution tasks. The compaction plugin operates during context transitions.
+Each plugin publishes its behaviour through the host, so the entry points belong to the host rather than to a command of their own.
 
-Example CLI usage:
+| Plugin | Hook or role | What happens |
+| --- | --- | --- |
+| `feedback-reactions` | `gateway_platform_event` | A reaction appends a line to `$HERMES_HOME/data/feedback.jsonl`. |
+| `proot-sandbox` | terminal backend | Shell commands run under proot: `/workspace` writable, `$HERMES_HOME` not mounted. |
+| `skill-factory` | `post_tool_call` | Watches the session and proposes the repeated part as a skill through `/skill-factory-propose`. |
+| `jev_compact` | context engine | Compresses the prompt once it crosses `threshold_tokens`, cutting stale tool results instead of summarising them. |
 
-```bash
-# Generate a new skill
-hermes skill create my_new_skill
+Each plugin declares its options in `plugin.yaml` under `config_schema`; the host passes the values to the plugin.
 
-# Execute code in sandbox
-hermes safe-run "python script.py"
-
-# View feedback logs
-hermes feedback log
-```
+| Plugin | Option | Meaning |
+| --- | --- | --- |
+| `jev_compact` | `threshold_tokens` | Compress once the prompt reaches this many tokens (default 250000). |
+| `jev_compact` | `protect_first_n`, `protect_last_n` | Messages at the head and tail that are never touched. |
+| `jev_compact` | `drop_probability` | Probability above which an answered tool call is dropped (default 0.75). |
+| `proot-sandbox` | `workspace` | Host directory mounted as `/workspace`. |
+| `proot-sandbox` | `scratch_home`, `scratch_tmp` | Directories mounted as the sandbox home and `/tmp`. |
 
 ## Outputs/Artifacts
 
@@ -156,8 +160,15 @@ The test suite includes unit tests for all plugins, integration tests for cross-
 
 ## Deployment
 
-Install in your Hermes Agent environment using pip. Configure plugin settings according to operational requirements. Verify functionality through test commands before production deployment. Monitor resource usage and adjust configuration accordingly.
+```bash
+git clone https://github.com/ipanalytics/Hermes-Plugin-Pack.git
+cp -r Hermes-Plugin-Pack/plugins/* "$HERMES_HOME/plugins/"
+# add the names to plugins.enabled in config.yaml, then restart the gateway
+```
 
+Verification is behavioural, because there is no service to ping: send a reaction and read the journal line, run a shell command and check that the home directory is not visible inside the sandbox, cross the token threshold and read `$HERMES_HOME/data/jev_compact_decisions.jsonl`.
+
+Rollback is the reverse of installation: remove the name from `plugins.enabled` and delete the directory. The journal and the decision log are plain files under `$HERMES_HOME/data/` and survive either way.
 ## License
 
 MIT License. See LICENSE file for full terms.
