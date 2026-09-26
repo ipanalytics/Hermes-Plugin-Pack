@@ -9,8 +9,6 @@ _English version: [README.md](README.md)_
 оценок, черновик навыков, песочница для команд и компакция контекста, которая ничего не
 переписывает.
 
-*English version: [README.md](README.md)*
-
 ---
 
 ## Что внутри

@@ -10,8 +10,6 @@ Most plugin examples you find are demos. These are the pieces that survived mont
 use — a feedback journal, a skill drafter, a sandboxed shell, and a context compactor that
 never rewrites your transcript.
 
-*Русская версия: [README.ru.md](README.ru.md)*
-
 ---
 
 ## What is inside
