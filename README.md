@@ -1,5 +1,7 @@
 # Hermes Plugin Pack
 
+_Русская версия: [README.ru.md](README.ru.md)_
+
 Four plugins we run every day on a Hermes Agent box. They are small on purpose: each plugin is a
 directory with a manifest and one or two Python files, no third-party dependencies, and does one
 job that the default agent does not do.
